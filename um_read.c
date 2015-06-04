@@ -1,54 +1,46 @@
-#include"um_read.h"
-#include<bitpack.h>
-
-uint32_t* read_program(FILE* program) // should actually be called 'run_program'
-{
-  uint32_t temp, cur_word;
-  temp = cur_word = 0;
-  char* cur_word_ptr = (char*)&cur_word;
-  char* temp_ptr = (char*)&temp; 
 /*
-  int op_code, a, b, c; 
-  op_code = a = b = c = -1;
-  unsigned val_13; */
-  uint32_t num_words = 0, array_len = 4; 
-  uint32_t* main_seg = malloc(sizeof(uint32_t) * array_len);
-  //printf("op %u\tt\tnum words %u\n", op_code, num_words);
-  do 
-  {
-    fread(&temp, 4, 1, program);
-   // credit to 
-   // http://graphics.stanford.edu/~seander/bithacks.html#BitReverseTable
-   for (unsigned i = 0; i < 4; i++)
-   {
-     cur_word_ptr[i] = 
-           ((temp_ptr[3 - i] * 0x80200802ULL) & 0x0884422110ULL) 
-                                            * 0x0101010101ULL >> 32;
-                              
-   } 
-   printf("%u\b", cur_word);
-  /*op_code = (int)Bitpack_getu(cur_word, 4,  28);
+ * um_read.c
+ * by Maxim Kachalov, 1 - 14 -2015
+ * Universal Machine
+ * 
+ * implementation of a function to read .um file and create a uint32_t array
+ * representing the sequence of instruction words in it
  *
-    if (op_code == 13)
-    {
-      a, val_13 = Bitpack_getu(cur_word, 25, 0), Bitpack_getu(cur_word, 3, 25);
-      printf("a %u\t\tval_13 %u\n", a, val_13);
-    }t 
-    else
-    {
-      a, b, c = Bitpack_getu(cur_word, 3, 6), Bitpack_getu(cur_word, 3, 3), 
-                 Bitpack_getu(cur_word, 3, 0); 
-    }
-    //printf("%u\n", op_code);
-    printf("nw %u\n", num_words);*/
-    main_seg[num_words++] = cur_word;
-    if (num_words >= (array_len - 1)) 
-    { 
-      if (num_words >= (((uint64_t)1 << 32) - 1)) { printf("ERROR\n"); break; }
-      main_seg = realloc((void*)main_seg, sizeof(uint32_t) * array_len * 2); 
-      array_len *= 2; 
-    }
-  //  printf("num w %u\t\tarray len %u\n\n", num_words, array_len);
-  } while (!feof(program));
-  return main_seg;
+ */
+
+#include <stdlib.h>
+#include "um_read.h"
+
+/*
+ * given FILE* opened from valid .um program, returns a uint32_t array 
+ * corresponding to the sequence of instructions in the file
+ */
+uint32_t* read_program(FILE* program) {
+        uint32_t temp, cur_word;
+        temp = cur_word = 0;
+
+        // char pointers used in lines 30-33 to change endian-ness
+        char* cur_word_ptr = (char*)&cur_word;
+        char* temp_ptr = (char*)&temp; 
+
+        uint32_t num_words = 0;
+        uint32_t array_len = 1;
+        uint32_t* seg_z = malloc(sizeof(uint32_t) * array_len); // segment zero
+
+        while (!feof(program)) {
+                fread(&cur_word, 4, 1, program);
+                // change big-endian .um file words to litle-endian instructions
+                for (unsigned i = 0; i < 4; i ++) {
+                        temp_ptr[i] = cur_word_ptr[3 - i];
+                }
+                seg_z[num_words] = temp;
+                num_words += 1;
+                // resize main segment if necessary
+                if (num_words == array_len) { 
+                        array_len *= 2;
+                        seg_z = realloc(seg_z, sizeof(uint32_t) * array_len); 
+                }
+        }
+        seg_z = realloc(seg_z, sizeof(uint32_t) * num_words);
+        return seg_z;
 }
